@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String?
+  role      String   @default("user")
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  orders    Order[]
+  
+  @@map("users")
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  userId           String?
+  externalReference String     @unique // Referência do Mercado Pago
+  preferenceId     String?     // ID da preferência do Mercado Pago
+  status           String      @default("pending") // pending, processing, shipped, delivered, cancelled
+  paymentStatus    String      @default("pending") // pending, approved, rejected, refunded, cancelled
+  total            Float
+  subtotal         Float
+  discount         Float       @default(0)
+  shipping         Float       @default(0)
+  
+  // Dados do cliente
+  customerName     String
+  customerEmail    String
+  customerPhone    String?
+  
+  // Endereço de entrega
+  shippingStreet   String
+  shippingCity     String
+  shippingState    String
+  shippingZipCode  String
+  shippingCountry  String      @default("Brasil")
+  
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  
+  items            OrderItem[]
+  payments         Payment[]
+  
+  user             User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  productId   String
+  productName String
+  price       Float
+  quantity    Int
+  image       String?
+  
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@map("order_items")
+}
+
+model Payment {
+  id                  String   @id @default(cuid())
+  orderId             String
+  mercadoPagoId       String   @unique // ID do pagamento no Mercado Pago
+  status              String   // approved, pending, rejected, refunded, cancelled
+  statusDetail        String?
+  paymentMethodId     String?
+  paymentTypeId       String?
+  transactionAmount   Float
+  currencyId          String   @default("BRL")
+  description         String?
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@map("payments")
+}
+
+
+
