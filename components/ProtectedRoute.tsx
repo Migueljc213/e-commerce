@@ -1,16 +1,16 @@
 'use client'
 
-import { useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 
-interface ProtectedRouteProps {
+type ProtectedRouteProps = {
   children: React.ReactNode
   requireAdmin?: boolean
   redirectTo?: string
 }
 
-export default function ProtectedRoute({
+function ProtectedRoute({
   children,
   requireAdmin = false,
   redirectTo,
@@ -41,5 +41,5 @@ export default function ProtectedRoute({
   return <>{children}</>
 }
 
-
-
+export { ProtectedRoute }
+export default ProtectedRoute

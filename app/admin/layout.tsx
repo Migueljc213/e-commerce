@@ -1,11 +1,11 @@
 'use client'
 
+import React, { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { 
   FiHome, 
   FiPackage, 

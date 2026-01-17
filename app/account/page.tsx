@@ -1,37 +1,66 @@
 'use client'
 
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import { FiUser, FiPackage, FiLogOut, FiEdit, FiShoppingCart } from 'react-icons/fi'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { FiUser, FiPackage, FiLogOut, FiEdit, FiShoppingCart, FiTruck, FiLoader } from 'react-icons/fi'
 import Link from 'next/link'
+
+interface Order {
+  id: string
+  createdAt: string | Date
+  total: number
+  status: string
+  paymentStatus?: string
+  items?: Array<{ quantity: number }>
+}
 
 export default function AccountPage() {
   const router = useRouter()
-  const { user, logout } = useAuthStore()
+  const { user, logout, isAuthenticated } = useAuthStore()
+  const [orders, setOrders] = useState<Order[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      fetchOrders()
+    }
+  }, [isAuthenticated, user?.id])
+
+  const fetchOrders = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/orders', {
+        headers: {
+          'x-user-id': user?.id || '',
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        // Transform orders to match expected format
+        const transformedOrders = data.map((order: any) => ({
+          id: order.id,
+          createdAt: new Date(order.createdAt),
+          total: order.total,
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          items: order.items || [],
+        }))
+        setOrders(transformedOrders)
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleLogout = () => {
     logout()
     router.push('/')
   }
-
-  // Mock orders - in a real app, this would come from an API
-  const orders = [
-    {
-      id: '1',
-      date: new Date('2024-01-15'),
-      total: 1299.99,
-      status: 'delivered' as const,
-      items: 2,
-    },
-    {
-      id: '2',
-      date: new Date('2024-01-10'),
-      total: 4599.99,
-      status: 'shipped' as const,
-      items: 1,
-    },
-  ]
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -55,9 +84,8 @@ export default function AccountPage() {
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
 
-  return (
-    <ProtectedRoute>
-      <div className="container mx-auto px-4 py-8">
+  const content = (
+    <div className="container mx-auto px-4 py-8">
         <h1 className="text-4xl font-bold mb-8 text-gray-900">Minha Conta</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -121,40 +149,63 @@ export default function AccountPage() {
               <h2 className="text-2xl font-bold text-gray-900">Meus Pedidos</h2>
             </div>
 
-            {orders.length > 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12">
+                <FiLoader className="mx-auto text-primary-600 animate-spin mb-4" size={48} />
+                <p className="text-gray-600">Carregando pedidos...</p>
+              </div>
+            ) : orders.length > 0 ? (
               <div className="space-y-4">
-                {orders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          Pedido #{order.id}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {order.date.toLocaleDateString('pt-BR')}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {order.items} item{order.items !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                      <div className="flex flex-col sm:items-end gap-2">
-                        <span className="text-lg font-bold text-gray-900">
-                          R$ {order.total.toFixed(2).replace('.', ',')}
-                        </span>
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                            order.status
-                          )}`}
-                        >
-                          {getStatusLabel(order.status)}
-                        </span>
+                {orders.map((order) => {
+                  const orderDate = typeof order.createdAt === 'string' 
+                    ? new Date(order.createdAt) 
+                    : order.createdAt
+                  const itemsCount = order.items?.reduce((sum, item) => sum + item.quantity, 0) || order.items?.length || 0
+                  
+                  return (
+                    <div
+                      key={order.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="font-semibold text-gray-900">
+                              Pedido #{order.id.slice(0, 8)}
+                            </p>
+                            {order.paymentStatus === 'approved' && order.status !== 'delivered' && (
+                              <Link
+                                href={`/tracking?orderId=${order.id}`}
+                                className="flex items-center gap-1 text-primary-600 hover:text-primary-700 text-sm"
+                              >
+                                <FiTruck size={16} />
+                                Rastrear
+                              </Link>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            {orderDate.toLocaleDateString('pt-BR')}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {itemsCount} item{itemsCount !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <div className="flex flex-col sm:items-end gap-2">
+                          <span className="text-lg font-bold text-gray-900">
+                            R$ {order.total.toFixed(2).replace('.', ',')}
+                          </span>
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                              order.status
+                            )}`}
+                          >
+                            {getStatusLabel(order.status)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="text-center py-12">
@@ -172,6 +223,12 @@ export default function AccountPage() {
         </div>
       </div>
     </div>
+  )
+
+  return (
+    <ProtectedRoute>
+      {content}
+    </ProtectedRoute>
   )
 }
 

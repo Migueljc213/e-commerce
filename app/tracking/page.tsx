@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { FiPackage, FiTruck, FiCheckCircle, FiClock, FiSearch } from 'react-icons/fi'
 
 interface TrackingInfo {
@@ -17,51 +18,126 @@ interface TrackingInfo {
   }>
 }
 
-export default function TrackingPage() {
-  const [orderId, setOrderId] = useState('')
+const getStatusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    pending: 'Pendente',
+    processing: 'Processando',
+    shipped: 'Enviado',
+    delivered: 'Entregue',
+    cancelled: 'Cancelado',
+  }
+  return labels[status] || status
+}
+
+const calculateEstimatedDelivery = (createdAt: Date) => {
+  const deliveryDate = new Date(createdAt)
+  deliveryDate.setDate(deliveryDate.getDate() + 10) // 10 days after order
+  return deliveryDate.toISOString().split('T')[0]
+}
+
+const generateTrackingCode = (orderId: string) => {
+  return `BR${orderId.slice(0, 11).toUpperCase().padEnd(11, '0')}BR`
+}
+
+const generateHistory = (order: any): Array<{ date: string; status: string; location: string }> => {
+  const history = []
+  const createdAt = new Date(order.createdAt)
+
+  history.push({
+    date: createdAt.toISOString().split('T')[0],
+    status: 'Pedido confirmado',
+    location: 'Loja Online',
+  })
+
+  if (order.status !== 'pending') {
+    const processingDate = new Date(createdAt)
+    processingDate.setDate(processingDate.getDate() + 1)
+    history.push({
+      date: processingDate.toISOString().split('T')[0],
+      status: 'Pedido em preparação',
+      location: 'Centro de Distribuição',
+    })
+  }
+
+  if (order.status === 'shipped' || order.status === 'delivered') {
+    const shippedDate = new Date(createdAt)
+    shippedDate.setDate(shippedDate.getDate() + 2)
+    history.push({
+      date: shippedDate.toISOString().split('T')[0],
+      status: 'Pedido enviado',
+      location: `Centro de Distribuição - ${order.shippingCity}/${order.shippingState}`,
+    })
+  }
+
+  if (order.status === 'delivered') {
+    const deliveredDate = new Date(createdAt)
+    deliveredDate.setDate(deliveredDate.getDate() + 5)
+    history.push({
+      date: deliveredDate.toISOString().split('T')[0],
+      status: 'Pedido entregue',
+      location: `${order.shippingStreet}, ${order.shippingCity}/${order.shippingState}`,
+    })
+  }
+
+  return history
+}
+
+function TrackingContent() {
+  const searchParams = useSearchParams()
+  const initialOrderId = searchParams.get('orderId') || ''
+  const [orderId, setOrderId] = useState(initialOrderId)
   const [trackingInfo, setTrackingInfo] = useState<TrackingInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Mock tracking data
-  const mockTrackingData: Record<string, TrackingInfo> = {
-    '12345': {
-      orderId: '12345',
-      status: 'shipped',
-      statusLabel: 'Enviado',
-      estimatedDelivery: '2024-01-25',
-      trackingCode: 'BR123456789BR',
-      currentLocation: 'Centro de Distribuição - São Paulo/SP',
-      history: [
-        {
-          date: '2024-01-20',
-          status: 'Pedido confirmado',
-          location: 'Loja Online',
-        },
-        {
-          date: '2024-01-21',
-          status: 'Pedido em preparação',
-          location: 'Centro de Distribuição',
-        },
-        {
-          date: '2024-01-22',
-          status: 'Pedido enviado',
-          location: 'Centro de Distribuição - São Paulo/SP',
-        },
-      ],
-    },
+  useEffect(() => {
+    if (initialOrderId) {
+      handleSearchFromOrderId(initialOrderId)
+    }
+  }, [initialOrderId])
+
+  const handleSearchFromOrderId = async (id: string) => {
+    if (!id.trim()) return
+
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/orders?orderId=${id}`)
+      
+      if (response.ok) {
+        const order = await response.json()
+        if (order) {
+          const history = generateHistory(order)
+          const tracking: TrackingInfo = {
+            orderId: order.id,
+            status: order.status,
+            statusLabel: getStatusLabel(order.status),
+            estimatedDelivery: calculateEstimatedDelivery(new Date(order.createdAt)),
+            trackingCode: generateTrackingCode(order.id),
+            currentLocation: order.status === 'delivered' 
+              ? `${order.shippingStreet}, ${order.shippingCity}/${order.shippingState}`
+              : order.status === 'shipped'
+              ? `Centro de Distribuição - ${order.shippingCity}/${order.shippingState}`
+              : 'Loja Online',
+            history,
+          }
+          setTrackingInfo(tracking)
+        } else {
+          setTrackingInfo(null)
+        }
+      } else {
+        setTrackingInfo(null)
+      }
+    } catch (error) {
+      console.error('Error fetching order:', error)
+      setTrackingInfo(null)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!orderId.trim()) return
-
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const info = mockTrackingData[orderId]
-    setTrackingInfo(info || null)
-    setIsLoading(false)
+    await handleSearchFromOrderId(orderId)
   }
 
   const getStatusIcon = (status: string) => {
@@ -198,6 +274,21 @@ export default function TrackingPage() {
         ) : null}
       </div>
     </div>
+  )
+}
+
+export default function TrackingPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-4xl font-bold mb-8 text-gray-900">Rastrear Pedido</h1>
+        <div className="max-w-2xl mx-auto">
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    }>
+      <TrackingContent />
+    </Suspense>
   )
 }
 

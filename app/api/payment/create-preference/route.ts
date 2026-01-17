@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { MercadoPagoConfig, Preference } from 'mercadopago'
 import { createOrder } from '@/lib/orders'
 
-// Inicializar cliente do Mercado Pago
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
-  options: {
-    timeout: 5000,
-    idempotencyKey: 'abc',
-  },
-})
-
-const preference = new Preference(client)
+// MODO MOCK: Retorna dados simulados sem chamar o MercadoPago real
+// Para ativar integração real, defina USE_MERCADOPAGO_REAL=true nas variáveis de ambiente
+const USE_REAL_MERCADOPAGO = process.env.USE_MERCADOPAGO_REAL === 'true'
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +23,7 @@ export async function POST(request: NextRequest) {
     const shippingCost = 15.0
     const finalTotal = subtotal - discount + shippingCost
 
-    // Criar pedido no banco de dados ANTES de criar a preferência
+    // Criar pedido no banco de dados
     const order = await createOrder({
       userId: userId || undefined,
       items: items.map((item: any) => ({
@@ -55,7 +47,40 @@ export async function POST(request: NextRequest) {
       shippingCountry: shippingAddress.country || 'Brasil',
     })
 
-    // Preparar itens para o Mercado Pago
+    // MODO MOCK: Retornar dados simulados
+    if (!USE_REAL_MERCADOPAGO) {
+      const mockPreferenceId = `mock_preference_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      
+      return NextResponse.json({
+        id: mockPreferenceId,
+        init_point: `${baseUrl}/payment/process?preference_id=${mockPreferenceId}&order_id=${order.id}`,
+        sandbox_init_point: `${baseUrl}/payment/process?preference_id=${mockPreferenceId}&order_id=${order.id}`,
+        orderId: order.id,
+        externalReference: order.externalReference,
+      })
+    }
+
+    // CÓDIGO REAL DO MERCADOPAGO (executado apenas se USE_MERCADOPAGO_REAL=true)
+    let MercadoPagoConfig, Preference
+    try {
+      const mercadoPagoModule = await import('mercadopago')
+      MercadoPagoConfig = mercadoPagoModule.MercadoPagoConfig
+      Preference = mercadoPagoModule.Preference
+    } catch (error) {
+      throw new Error('MercadoPago SDK não está disponível. Certifique-se de que está instalado quando USE_MERCADOPAGO_REAL=true')
+    }
+    
+    const client = new MercadoPagoConfig({
+      accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
+      options: {
+        timeout: 5000,
+        idempotencyKey: 'abc',
+      },
+    })
+
+    const preference = new Preference(client)
+
     const preferenceItems = items.map((item: any) => ({
       id: item.id,
       title: item.name,
@@ -66,7 +91,6 @@ export async function POST(request: NextRequest) {
       picture_url: item.image,
     }))
 
-    // Criar preferência de pagamento
     const preferenceData = {
       items: preferenceItems,
       payer: {
@@ -102,17 +126,10 @@ export async function POST(request: NextRequest) {
       },
       notification_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/payment/webhook`,
       statement_descriptor: 'ECOMMERCE STORE',
-      external_reference: order.externalReference, // Usar a referência do pedido criado
+      external_reference: order.externalReference,
     }
 
     const response = await preference.create({ body: preferenceData })
-
-    // Atualizar o pedido com o ID da preferência
-    const { prisma } = await import('@/lib/db')
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { preferenceId: response.id },
-    })
 
     return NextResponse.json({
       id: response.id,

@@ -21,16 +21,31 @@ export const useCartStore = create<CartStore>()(
         const existingItem = items.find((item) => item.id === product.id)
 
         if (existingItem) {
-          set({
-            items: items.map((item) =>
-              item.id === product.id
-                ? { ...item, quantity: item.quantity + quantity }
-                : item
-            ),
-          })
+          // Validate stock before adding
+          const newQuantity = existingItem.quantity + quantity
+          if (newQuantity > product.stock) {
+            // Limit to available stock
+            set({
+              items: items.map((item) =>
+                item.id === product.id
+                  ? { ...item, quantity: product.stock }
+                  : item
+              ),
+            })
+          } else {
+            set({
+              items: items.map((item) =>
+                item.id === product.id
+                  ? { ...item, quantity: newQuantity }
+                  : item
+              ),
+            })
+          }
         } else {
+          // Validate stock for new item
+          const finalQuantity = quantity > product.stock ? product.stock : quantity
           set({
-            items: [...items, { ...product, quantity }],
+            items: [...items, { ...product, quantity: finalQuantity }],
           })
         }
       },
@@ -44,8 +59,17 @@ export const useCartStore = create<CartStore>()(
           get().removeItem(productId)
           return
         }
+        
+        // Validate stock
+        const items = get().items
+        const item = items.find((i) => i.id === productId)
+        if (item && quantity > item.stock) {
+          // Limit to available stock
+          quantity = item.stock
+        }
+        
         set({
-          items: get().items.map((item) =>
+          items: items.map((item) =>
             item.id === productId ? { ...item, quantity } : item
           ),
         })

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { MercadoPagoConfig, Payment } from 'mercadopago'
 import {
   findOrderByExternalReference,
   createPayment,
@@ -8,11 +7,8 @@ import {
   updateOrderStatus,
 } from '@/lib/orders'
 
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
-})
-
-const payment = new Payment(client)
+// MODO MOCK: Não inicializa MercadoPago se estiver em modo mock
+const USE_REAL_MERCADOPAGO = process.env.USE_MERCADOPAGO_REAL === 'true'
 
 // Mapear status do Mercado Pago para status do sistema
 function mapPaymentStatus(status: string): string {
@@ -48,8 +44,38 @@ export async function POST(request: NextRequest) {
     if (type === 'payment') {
       const paymentId = data.id
 
-      // Buscar informações do pagamento no Mercado Pago
-      const paymentInfo = await payment.get({ id: paymentId })
+      let paymentInfo: any
+
+      // MODO MOCK: Usar dados recebidos diretamente sem chamar MercadoPago
+      if (!USE_REAL_MERCADOPAGO) {
+        paymentInfo = {
+          id: data.id || paymentId,
+          status: data.status || 'approved',
+          status_detail: data.status_detail || 'accredited',
+          external_reference: data.external_reference || '',
+          transaction_amount: data.transaction_amount || 0,
+          payment_method_id: data.payment_method_id || undefined,
+          payment_type_id: data.payment_type_id || undefined,
+          currency_id: data.currency_id || 'BRL',
+          description: data.description || undefined,
+        }
+      } else {
+        // CÓDIGO REAL DO MERCADOPAGO
+        let MercadoPagoConfig, Payment
+        try {
+          const mercadoPagoModule = await import('mercadopago')
+          MercadoPagoConfig = mercadoPagoModule.MercadoPagoConfig
+          Payment = mercadoPagoModule.Payment
+        } catch (error) {
+          throw new Error('MercadoPago SDK não está disponível. Certifique-se de que está instalado quando USE_MERCADOPAGO_REAL=true')
+        }
+        
+        const client = new MercadoPagoConfig({
+          accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
+        })
+        const payment = new Payment(client)
+        paymentInfo = await payment.get({ id: paymentId })
+      }
 
       // Verificar se o pagamento já existe no banco
       let dbPayment = await findPaymentByMercadoPagoId(String(paymentInfo.id))

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
 import { Address } from '@/types'
 import { FiLock, FiTruck, FiCheck, FiCreditCard } from 'react-icons/fi'
 import { useCouponStore } from '@/store/couponStore'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -100,7 +100,7 @@ export default function CheckoutPage() {
         throw new Error(data.error || 'Erro ao processar pagamento')
       }
 
-      // Redirecionar para o checkout do Mercado Pago
+      // Obter URL de checkout (pode ser simulação ou MercadoPago real)
       const checkoutUrl = process.env.NODE_ENV === 'production' 
         ? data.init_point 
         : data.sandbox_init_point || data.init_point
@@ -121,7 +121,7 @@ export default function CheckoutPage() {
         }
         sessionStorage.setItem('pendingOrder', JSON.stringify(orderData))
         
-        // Redirecionar para Mercado Pago
+        // Redirecionar para página de pagamento (simulação ou MercadoPago real)
         window.location.href = checkoutUrl
       } else {
         throw new Error('URL de checkout não disponível')
@@ -133,20 +133,18 @@ export default function CheckoutPage() {
     }
   }
 
-  return (
-    <ProtectedRoute>
-      {items.length === 0 ? (
-        <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="text-3xl font-bold mb-4">Seu carrinho está vazio</h1>
-          <button
-            onClick={() => router.push('/products')}
-            className="text-primary-600 hover:underline"
-          >
-            Voltar para produtos
-          </button>
-        </div>
-      ) : (
-        <div className="container mx-auto px-4 py-8">
+  const content = items.length === 0 ? (
+    <div className="container mx-auto px-4 py-16 text-center">
+      <h1 className="text-3xl font-bold mb-4">Seu carrinho está vazio</h1>
+      <button
+        onClick={() => router.push('/products')}
+        className="text-primary-600 hover:underline"
+      >
+        Voltar para produtos
+      </button>
+    </div>
+  ) : (
+    <div className="container mx-auto px-4 py-8">
       <h1 className="text-4xl font-bold mb-8 text-gray-900">Finalizar Compra</h1>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -351,8 +349,12 @@ export default function CheckoutPage() {
           </div>
         </div>
       </form>
-      </div>
-      )}
+    </div>
+  )
+
+  return (
+    <ProtectedRoute>
+      {content}
     </ProtectedRoute>
   )
 }

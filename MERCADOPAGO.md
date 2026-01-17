@@ -2,20 +2,51 @@
 
 Este projeto inclui integração completa com o Mercado Pago para processamento de pagamentos.
 
+## 🎯 Modo de Operação
+
+O sistema funciona em **dois modos**:
+
+### Modo Mock (Padrão - MVP)
+Por padrão, o sistema funciona em **modo simulação (mock)**. Isso significa que:
+- ✅ Todo o fluxo visual funciona perfeitamente
+- ✅ Nenhuma chamada real ao MercadoPago é feita
+- ✅ Ideal para demonstrações e MVPs
+- ✅ Não requer credenciais do MercadoPago
+
+**O sistema está configurado em modo mock por padrão!** Todas as telas de pagamento, checkout e confirmação funcionam visualmente, mas sem processar pagamentos reais.
+
+### Modo Real (Integração Completa)
+Para ativar a integração real com MercadoPago:
+
+1. Defina a variável de ambiente `USE_MERCADOPAGO_REAL=true`
+2. Configure as credenciais do MercadoPago (veja abaixo)
+
 ## 🔧 Configuração
 
-### 1. Obter Credenciais
+### 1. Modo Mock (Recomendado para MVP)
+
+Nenhuma configuração necessária! O sistema já está funcionando em modo mock.
+
+### 2. Modo Real - Obter Credenciais
 
 1. Acesse [Mercado Pago Developers](https://www.mercadopago.com.br/developers)
 2. Crie uma conta ou faça login
 3. Vá em "Suas integrações" > "Criar aplicação"
 4. Copie o **Access Token** (use o token de teste para desenvolvimento)
 
-### 2. Configurar Variáveis de Ambiente
+### 3. Configurar Variáveis de Ambiente
 
 Crie um arquivo `.env.local` na raiz do projeto:
 
+**Para Modo Mock (MVP):**
 ```env
+# Não precisa configurar nada! O modo mock funciona sem credenciais
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+```
+
+**Para Modo Real:**
+```env
+USE_MERCADOPAGO_REAL=true
 MERCADOPAGO_ACCESS_TOKEN=TEST-seu_access_token_aqui
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```
@@ -24,30 +55,34 @@ NEXT_PUBLIC_BASE_URL=http://localhost:3000
 - Use tokens de **TEST** para desenvolvimento
 - Use tokens de **PROD** para produção
 - Nunca commite tokens no repositório
+- Para MVP, não é necessário configurar credenciais
 
 ## 📋 Fluxo de Pagamento
 
-### 1. Criação de Preferência
+### Modo Mock (MVP)
 
-Quando o usuário finaliza o checkout, o sistema:
+1. **Checkout:** Usuário preenche dados de entrega
+2. **Página de Simulação:** Redireciona para página de simulação de pagamento (`/payment/process`)
+3. **Pagamento Simulado:** Usuário escolhe método (Cartão, PIX, Boleto) e simula pagamento
+4. **Confirmação:** Redireciona para página de sucesso com dados mockados
 
-1. Cria uma preferência de pagamento via API (`/api/payment/create-preference`)
-2. Recebe uma URL de checkout do Mercado Pago
-3. Redireciona o usuário para o checkout seguro
+### Modo Real
 
-### 2. Processamento
+1. **Criação de Preferência:**
+   - Quando o usuário finaliza o checkout, o sistema cria uma preferência via API
+   - Recebe uma URL de checkout do Mercado Pago
+   - Redireciona o usuário para o checkout seguro do MercadoPago
 
-O usuário:
-1. Completa o pagamento no checkout do Mercado Pago
-2. É redirecionado de volta para o site
-3. O status é verificado automaticamente
+2. **Processamento:**
+   - O usuário completa o pagamento no checkout do Mercado Pago
+   - É redirecionado de volta para o site
+   - O status é verificado automaticamente
 
-### 3. Webhook
-
-O Mercado Pago envia notificações via webhook (`/api/payment/webhook`) quando:
-- O pagamento é aprovado
-- O pagamento é rejeitado
-- O status muda
+3. **Webhook:**
+   - O Mercado Pago envia notificações via webhook (`/api/payment/webhook`) quando:
+     - O pagamento é aprovado
+     - O pagamento é rejeitado
+     - O status muda
 
 ## 🧪 Teste de Pagamentos
 

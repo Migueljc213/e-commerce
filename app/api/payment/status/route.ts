@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { MercadoPagoConfig, Payment } from 'mercadopago'
 
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
-})
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
 
-const payment = new Payment(client)
+// MODO MOCK: Retorna dados simulados sem chamar o MercadoPago real
+const USE_REAL_MERCADOPAGO = process.env.USE_MERCADOPAGO_REAL === 'true'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +18,35 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // MODO MOCK: Retornar dados simulados (pagamento sempre aprovado no mock)
+    if (!USE_REAL_MERCADOPAGO) {
+      // Simular um ID de pagamento mockado
+      const mockPaymentId = paymentId.startsWith('mock_') ? paymentId : `mock_payment_${Date.now()}`
+      
+      return NextResponse.json({
+        id: mockPaymentId,
+        status: 'approved',
+        status_detail: 'accredited',
+        external_reference: searchParams.get('external_reference') || `order_${Date.now()}`,
+        transaction_amount: parseFloat(searchParams.get('amount') || '0'),
+      })
+    }
+
+    // CÓDIGO REAL DO MERCADOPAGO (executado apenas se USE_MERCADOPAGO_REAL=true)
+    let MercadoPagoConfig, Payment
+    try {
+      const mercadoPagoModule = await import('mercadopago')
+      MercadoPagoConfig = mercadoPagoModule.MercadoPagoConfig
+      Payment = mercadoPagoModule.Payment
+    } catch (error) {
+      throw new Error('MercadoPago SDK não está disponível. Certifique-se de que está instalado quando USE_MERCADOPAGO_REAL=true')
+    }
+    
+    const client = new MercadoPagoConfig({
+      accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
+    })
+
+    const payment = new Payment(client)
     const paymentInfo = await payment.get({ id: paymentId })
 
     return NextResponse.json({

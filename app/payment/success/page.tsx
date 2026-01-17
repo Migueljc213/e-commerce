@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { FiCheckCircle, FiPackage, FiHome, FiLoader } from 'react-icons/fi'
 import { useCartStore } from '@/store/cartStore'
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const clearCart = useCartStore((state) => state.clearCart)
@@ -17,6 +17,21 @@ export default function PaymentSuccessPage() {
     const paymentId = searchParams.get('payment_id')
     const preferenceId = searchParams.get('preference_id')
     const status = searchParams.get('status')
+
+    // Se já temos status na URL (modo mock), usar diretamente
+    if (status === 'approved' || status === 'pending' || status === 'rejected') {
+      setPaymentStatus({
+        status: status,
+        external_reference: preferenceId || `order_${Date.now()}`,
+      })
+      setIsLoading(false)
+
+      if (status === 'approved') {
+        clearCart()
+        sessionStorage.removeItem('pendingOrder')
+      }
+      return
+    }
 
     if (paymentId) {
       // Verificar status do pagamento
@@ -140,6 +155,21 @@ export default function PaymentSuccessPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-4 py-16">
+        <div className="max-w-2xl mx-auto text-center">
+          <FiLoader className="mx-auto text-primary-600 animate-spin mb-4" size={64} />
+          <p className="text-xl text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    }>
+      <PaymentSuccessContent />
+    </Suspense>
   )
 }
 

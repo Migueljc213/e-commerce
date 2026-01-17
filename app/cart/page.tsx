@@ -1,13 +1,13 @@
 'use client'
 
+import React, { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiTrash2, FiMinus, FiPlus, FiShoppingBag, FiTag } from 'react-icons/fi'
 import { useCartStore } from '@/store/cartStore'
 import { useCouponStore } from '@/store/couponStore'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 export default function CartPage() {
   const router = useRouter()
@@ -34,26 +34,24 @@ export default function CartPage() {
     }
   }
 
-  return (
-    <ProtectedRoute>
-      {items.length === 0 ? (
-        <div className="container mx-auto px-4 py-16 text-center">
-          <FiShoppingBag size={64} className="mx-auto text-gray-400 mb-4" />
-          <h1 className="text-3xl font-bold mb-4 text-gray-900">
-            Seu carrinho está vazio
-          </h1>
-          <p className="text-gray-600 mb-8">
-            Adicione produtos ao carrinho para continuar comprando.
-          </p>
-          <Link
-            href="/products"
-            className="inline-block bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors"
-          >
-            Ver Produtos
-          </Link>
-        </div>
-      ) : (
-        <div className="container mx-auto px-4 py-8">
+  const content = items.length === 0 ? (
+    <div className="container mx-auto px-4 py-16 text-center">
+      <FiShoppingBag size={64} className="mx-auto text-gray-400 mb-4" />
+      <h1 className="text-3xl font-bold mb-4 text-gray-900">
+        Seu carrinho está vazio
+      </h1>
+      <p className="text-gray-600 mb-8">
+        Adicione produtos ao carrinho para continuar comprando.
+      </p>
+      <Link
+        href="/products"
+        className="inline-block bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+      >
+        Ver Produtos
+      </Link>
+    </div>
+  ) : (
+    <div className="container mx-auto px-4 py-8">
       <h1 className="text-4xl font-bold mb-8 text-gray-900">Carrinho de Compras</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -227,7 +225,12 @@ export default function CartPage() {
           </div>
         </div>
       </div>
-      )}
+    </div>
+  )
+
+  return (
+    <ProtectedRoute>
+      {content}
     </ProtectedRoute>
   )
 }
